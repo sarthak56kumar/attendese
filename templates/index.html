@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Based OTP System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #status, #result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #e2e3e5;
+            color: #383d41;
+            border: 1px solid #d6d8db;
+        }
+        #locationInfo {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .device-list {
+            margin-top: 20px;
+        }
+        .device-item {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Location Based OTP System</h2>
+        
+        <!-- Device Registration Form -->
+        <div class="form-group">
+            <h3>Register New Device</h3>
+            <form id="registrationForm">
+                <label for="deviceName">Device Name:</label>
+                <input type="text" id="deviceName" required>
+                <button type="submit">Register Device</button>
+            </form>
+        </div>
+
+        <!-- Generate OTPs Section -->
+        <div class="form-group">
+            <h3>Generate OTPs for Nearby Devices</h3>
+            <button id="checkNearbyDevices">Check Nearby Devices & Generate OTPs</button>
+        </div>
+
+        <!-- Status and Results Display -->
+        <div id="locationInfo"></div>
+        <div id="status"></div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Function to get current location
+        function getCurrentLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject('Geolocation is not supported by your browser');
+                } else {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => resolve(position),
+                        (error) => reject(error)
+                    );
+                }
+            });
+        }
+
+        // Function to update status
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = type;
+            statusDiv.textContent = message;
+        }
+
+        // Function to update result
+        function updateResult(content) {
+            const resultDiv = document.getElementById('result');
+            if (typeof content === 'object') {
+                resultDiv.innerHTML = '<h4>Generated OTPs:</h4>';
+                for (const [device, otp] of Object.entries(content)) {
+                    resultDiv.innerHTML += `
+                        <div class="device-item">
+                            <strong>Device:</strong> ${device}<br>
+                            <strong>OTP:</strong> ${otp}
+                        </div>
+                    `;
+                }
+            } else {
+                resultDiv.textContent = content;
+            }
+        }
+
+        // Handle device registration
+        document.getElementById('registrationForm').onsubmit = async (e) => {
+            e.preventDefault();
+            updateStatus('Getting location...', 'info');
+
+            try {
+                const position = await getCurrentLocation();
+                const data = {
+                    name: document.getElementById('deviceName').value,
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude
+                };
+
+                const response = await fetch('/register_device', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                updateStatus(result.status, 'success');
+                document.getElementById('deviceName').value = '';
+                
+                // Update location info
+                document.getElementById('locationInfo').innerHTML = `
+                    Last location: Lat: ${position.coords.latitude.toFixed(6)}, 
+                    Long: ${position.coords.longitude.toFixed(6)}
+                `;
+            } catch (error) {
+                updateStatus(error.message, 'error');
+            }
+        };
+
+        // Handle OTP generation for nearby devices
+        document.getElementById('checkNearbyDevices').onclick = async () => {
+            updateStatus('Getting location...', 'info');
+
+            try {
+                const position = await getCurrentLocation();
+                const data = {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude
+                };
+
+                const response = await fetch('/generate_otps', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    updateStatus(result.error, 'error');
+                } else if (result.status) {
+                    updateStatus(result.status, 'info');
+                } else {
+                    updateStatus('OTPs generated successfully', 'success');
+                    updateResult(result);
+                }
+            } catch (error) {
+                updateStatus(error.message, 'error');
+            }
+        };
+    </script>
+</body>
+</html>

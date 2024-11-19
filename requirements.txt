@@ -1,0 +1,5 @@
+Flask==2.3.3
+geopy==2.2.0
+pyotp==2.6.0
+geocoder==1.38.1
+gunicorn==20.1.0
